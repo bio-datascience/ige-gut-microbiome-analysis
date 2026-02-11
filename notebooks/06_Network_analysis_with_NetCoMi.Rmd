@@ -8,6 +8,15 @@ date: "2025-12-19"
 knitr::opts_knit$set(root.dir = "~/ABROGATE")
 ```
 
+### Introduction
+This analysis constructs microbial association networks using the NetCoMi package to compare microbiome compositions between healthy (non-IgE) individuals and those with food allergies. We apply SPIEC-EASI (SParse InversE Covariance Estimation for Ecological Association Inference) with the graphical lasso method to infer microbial co-occurrence and co-exclusion patterns.
+
+The analysis focuses on three comparisons:
+- Non-IgE vs. all IgE-mediated food allergy samples
+- Non-IgE vs. Cluster B (specific allergic subgroup)
+- Non-IgE vs. Cluster E (specific allergic subgroup)
+
+### Load Required Libraries
 ```{r}
 library(magrittr) # needs to be run every time you start R and want to use %>%
 library(dplyr) # alternatively, this also loads %>%
@@ -16,13 +25,19 @@ library(NetCoMi)
 library(limma)
 ```
 
+### Load Count Data and Construct Networks
+
+Data preparation
+/Users/oleg.vlasovets/ABROGATE/analysis/09_networks/05_Network_analysis.ipynb
+
+We load taxonomic count data aggregated at the family level for each sample group. The data represents microbial family abundances across healthy and allergic individuals, with separate files for the full allergic cohort and specific patient clusters
 
 ```{r}
 ## 1. Load your specific data
 data_files <- list(
   healthy = 'data/counts_healthy_family.csv',
   allergic = 'data/counts_allergic_family.csv',
-  D = 'data/counts_D_family.csv',
+  B = 'data/counts_B_family.csv',
   E = 'data/counts_E_family.csv'
 )
 
@@ -32,27 +47,27 @@ raw_counts <- lapply(data_files, function(file) {
 })
 
 # Verification
-cat("Data dimensions:\n")
+cat("Bata dimensions:\n")
 for(name in names(raw_counts)) {
-  cat(sprintf("%s group: %d samples x %d taxa\n", 
+  cat(sprintf("%s group: %d samples x %d taxa\n",
               name, nrow(raw_counts[[name]]), ncol(raw_counts[[name]])))
 }
 
 ## 2. Network Construction
-# Define common parameters once
+# Befine common parameters once
 common_params <- list(
   measure = "spieceasi",
   measurePar = list(
-    method = "glasso", 
-    nlambda = 30, 
-    lambda.min.ratio = 0.01, 
+    method = "glasso",
+    nlambda = 30,
+    lambda.min.ratio = 0.01,
     pulsar.params = list(rep.num = 20)
   ),
-  filtSamp = "none", 
+  filtSamp = "none",
   filtTax = "highestVar",
   filtTaxPar = list(highestVar = 50),
-  normMethod = "none", 
-  sparsMethod = "none", 
+  normMethod = "none",
+  sparsMethod = "none",
   verbose = 3,
   seed = 123456
 )
@@ -65,7 +80,7 @@ construct_net <- function(data1, data2, params) {
 # Construct all networks
 networks <- list(
   any = construct_net(raw_counts$healthy, raw_counts$allergic, common_params),
-  D = construct_net(raw_counts$healthy, raw_counts$D, common_params),
+  B = construct_net(raw_counts$healthy, raw_counts$B, common_params),
   E = construct_net(raw_counts$healthy, raw_counts$E, common_params)
 )
 
@@ -74,48 +89,20 @@ networks_copy <- networks
 
 # Assign to individual variables
 net_any <- networks$any
-net_D <- networks$D
+net_B <- networks$B
 net_E <- networks$E
 
 # Individual copies (if you need to modify them separately)
 net_any_copy <- networks_copy$any
-net_D_copy <- networks_copy$D
+net_B_copy <- networks_copy$B
 net_E_copy <- networks_copy$E
 ```
 
-Since the code uses filtTax = "highestVar" with highestVar = 50, which selects taxa from the combined dataset :
+Since cluster B and E have different microbial compositions than the full allergic cohort, the variance profiles differ, resulting in different taxa sets. Even though SPIEC-EASI estimates the healthy network independently in each case, it operates on different taxa subsets, producing different edge structures.
 
-Network 'any': Top 50 variance taxa from (healthy + all allergic)
-Network 'D': Top 50 variance taxa from (healthy + cluster D)
-Network 'E': Top 50 variance taxa from (healthy + cluster E)
+### Network Visualization Setup
 
-Since cluster D and E have different microbial compositions than the full allergic cohort, the variance profiles differ, resulting in different 50-taxa sets. Even though SPIEC-EASI estimates the healthy network independently in each case, it operates on different taxa subsets, producing different edge structures .
-
-
-
-TO GET IDENTICAL NON-IGE NETWORKS:
-```{r}
-# # Filter healthy data first
-# healthy_filtered <- raw_counts$healthy
-# healthy_var <- apply(healthy_filtered, 2, var)
-# top_taxa <- names(sort(healthy_var, decreasing = TRUE)[1:50])
-# 
-# # Use same taxa for all groups
-# allergic_subset <- raw_counts$allergic[, top_taxa]
-# D_subset <- raw_counts$D[, top_taxa]
-# E_subset <- raw_counts$E[, top_taxa]
-# 
-# # Remove filtering from network construction
-# common_params$filtTax <- "none"
-# common_params$filtTaxPar <- NULL
-# 
-# networks <- list(
-#   any = construct_net(healthy_filtered[, top_taxa], allergic_subset, common_params),
-#   D = construct_net(healthy_filtered[, top_taxa], D_subset, common_params),
-#   E = construct_net(healthy_filtered[, top_taxa], E_subset, common_params)
-# )
-```
-
+We assign colors to bacterial phyla using a colorblind-friendly palette to ensure accessibility in visualizations [cite:5]. Each microbial family is colored according to its phylum membership for consistent interpretation across all network plots.
 
 ```{r}
 ## Load phylum labels and create color mapping
@@ -128,7 +115,7 @@ cat("\nUnique phyla:\n")
 print(table(p_labels$phylum))
 
 # Colorblind-friendly palette with 13 colors
-phylcolors <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", 
+phylcolors <- c("#88CCEE", "#CC6677", "#BBCC77", "#117733", "#332288", 
                 "#AA4499", "#44AA99", "#999933", "#882255", "#661100", 
                 "#6699CC", "#888888", "#E69F00")
 
@@ -167,11 +154,11 @@ network_configs <- list(
     filename_svg = "plots/svg/partial_corr_allergic_vs_healthy.svg",
     groups = c("non-IgE", "IgE")
   ),
-  D = list(
-    net = net_D,
-    filename_png = "plots/png/partial_corr_D_vs_healthy.png",
-    filename_svg = "plots/svg/partial_corr_D_vs_healthy.svg",
-    groups = c("non-IgE", "Cluster D")
+  B = list(
+    net = net_B,
+    filename_png = "plots/png/partial_corr_B_vs_healthy.png",
+    filename_svg = "plots/svg/partial_corr_B_vs_healthy.svg",
+    groups = c("non-IgE", "Cluster B")
   ),
   E = list(
     net = net_E,
@@ -234,7 +221,7 @@ results <- list()
 
 cat("\nSaving plots for network: any (IgE vs non-IgE)\n")
 
-# PNG - 4000 x 2500 pixels at 300 DPI = 13.33 x 8.33 inches
+# PNG - 4000 x 2500 pixels at 300 BPI = 13.33 x 8.33 inches
 png(network_configs$any$filename_png, width = 4000, height = 2500, res = 300)
 plot(props_any, 
      groupNames = network_configs$any$groups,
@@ -284,8 +271,8 @@ results$any <- list(props = props_any, plot = p_any, diff = diff_any,
                     node_colors = node_colors_any,
                     phylum_vector = phylum_vector_common)
 
-# Process D and E networks
-for(name in c("D", "E")) {
+# Process B and E networks
+for(name in c("B", "E")) {
   config <- network_configs[[name]]
   cat(sprintf("\nProcessing network: %s (using shared non-IgE layout)\n", name))
   
@@ -364,7 +351,7 @@ for(name in c("D", "E")) {
   dev.off()
   cat(sprintf("  SVG saved: %s\n", config$filename_svg))
   
-  # Differential network
+  # Bifferential network
   taxa_plot <- rownames(p$layout$layout1)
   net_diff <- net_filtered
   net_diff$assoMat1 <- net_filtered$assoMat1[taxa_plot, taxa_plot]
@@ -386,9 +373,9 @@ props_any <- results$any$props
 p_any <- results$any$plot
 diff_any <- results$any$diff
 
-props_D <- results$D$props
-p_D <- results$D$plot
-diff_D <- results$D$diff
+props_B <- results$B$props
+p_B <- results$B$plot
+diff_B <- results$B$diff
 
 props_E <- results$E$props
 p_E <- results$E$plot
@@ -399,24 +386,30 @@ cat("PNG plots saved to plots/png/\n")
 cat("SVG plots saved to plots/svg/\n")
 ```
 
+### Differential Network Analysis
 
+Differential network analysis identifies changes in microbial associations between healthy and allergic groups [cite:6]. Each edge in the differential network represents a change in association strength or direction between the two conditions. This reveals which microbial relationships are gained, lost, strengthened, weakened, or reversed in the context of food allergy.
+
+#### Generate Differential Network Plots
+We use a consistent spatial layout across all comparisons to facilitate visual comparison. Nodes (bacterial families) maintain the same positions, while edge colors indicate the type and direction of association changes [cite:7].
 
 ```{r}
-## 4. Plot Differential Networks with Shared Layout
+## 4. Plot Bifferential Networks with Shared Layout
 
-# Define differential plot parameters
+# Befine differential plot parameters
 diff_plot_params <- list(
   rmSingles = FALSE,
   mar = c(2, 2, 4, 10),
-  edgeCol = c("white",    # + | + (both positive, stronger in group 2) - HIDDEN
-              "#009E73",  # + | 0 (positive to zero) - teal/green
-              "#0072B2",  # + | - (positive to negative) - blue
-              "#E69F00",  # - | + (negative to positive) - orange
-              "white",    # - | 0 (negative to zero) - HIDDEN
-              "white",    # - | - (both negative) - HIDDEN
-              "#F0E442",  # 0 | + (zero to positive) - yellow
-              "white",    # 0 | 0 (no edge in either) - HIDDEN
-              "#D55E00"), # 0 | - (zero to negative) - red-orange
+  edgeCol = c("#CC79A7",  # + | + (both positive, stronger in group 2) - reddish purple
+            "#009E73",  # + | 0 (positive to zero) - teal/green
+            "#0072B2",  # + | - (positive to negative) - blue
+            "#E69F00",  # - | + (negative to positive) - orange
+            "#999999",  # - | 0 (negative to zero) - gray
+            "#56B4E9",  # - | - (both negative) - light blue (was white)
+            "#F0E442",  # 0 | + (zero to positive) - yellow
+            "white",  # 0 | 0 (no edge in either)
+            "#B55E00"),  # 0 | - (zero to negative) - red-orange
+
   edgeWidth = 2.0,
   labelScale = FALSE,
   cexLabels = 1.0
@@ -473,18 +466,18 @@ plot_diffnet_safe(
   base_plot = results$any$plot,
   filename_png = "plots/png/differential_allergic_vs_healthy.png",
   filename_svg = "plots/svg/differential_allergic_vs_healthy.svg",
-  title = "Differential Network: non-IgE vs IgE",
+  title = "Bifferential Network: non-IgE vs IgE",
   plot_params = diff_plot_params
 )
 
-# Plot differential network for 'D'
-cat("\nProcessing differential network: D (non-IgE vs Cluster D)\n")
+# Plot differential network for 'B'
+cat("\nProcessing differential network: B (non-IgE vs Cluster B)\n")
 plot_diffnet_safe(
-  diff_obj = results$D$diff,
-  base_plot = results$D$plot,
-  filename_png = "plots/png/differential_D_vs_healthy.png",
-  filename_svg = "plots/svg/differential_D_vs_healthy.svg",
-  title = "Differential Network: non-IgE vs Cluster D",
+  diff_obj = results$B$diff,
+  base_plot = results$B$plot,
+  filename_png = "plots/png/differential_B_vs_healthy.png",
+  filename_svg = "plots/svg/differential_B_vs_healthy.svg",
+  title = "Bifferential Network: non-IgE vs Cluster B",
   plot_params = diff_plot_params
 )
 
@@ -495,7 +488,7 @@ plot_diffnet_safe(
   base_plot = results$E$plot,
   filename_png = "plots/png/differential_E_vs_healthy.png",
   filename_svg = "plots/svg/differential_E_vs_healthy.svg",
-  title = "Differential Network: non-IgE vs Cluster E",
+  title = "Bifferential Network: non-IgE vs Cluster E",
   plot_params = diff_plot_params
 )
 
@@ -507,26 +500,35 @@ cat("Grey edges (non-significant differences) are hidden.\n")
 
 ```
 
+### Create Edge Change and Phylum Legends
+
+The edge legend explains how microbial associations change between healthy and allergic states, while the phylum legend provides taxonomic context for node colors.
+
 ```{r}
-# Define edge colors (matching your differential network settings)
-edgeCol <- c("white",    # + | + (both positive, stronger in group 2) - HIDDEN
-             "#009E73",  # + | 0 (positive to zero) - teal/green
-             "#0072B2",  # + | - (positive to negative) - blue
-             "#E69F00",  # - | + (negative to positive) - orange
-             "white",    # - | 0 (negative to zero) - HIDDEN
-             "white",    # - | - (both negative) - HIDDEN
-             "#F0E442",  # 0 | + (zero to positive) - yellow
-             "white",    # 0 | 0 (no edge in either) - HIDDEN
-             "#D55E00")  # 0 | - (zero to negative) - red-orange
+# Befine edge colors (matching your differential network settings)
+edgeCol = c("#CC79A7",  # + | + (both positive, stronger in group 2) - reddish purple
+            "#009E73",  # + | 0 (positive to zero) - teal/green
+            "#0072B2",  # + | - (positive to negative) - blue
+            "#E69F00",  # - | + (negative to positive) - orange
+            "#999999",  # - | 0 (negative to zero) - gray
+            "#56B4E9",  # - | - (both negative) - light blue (was white)
+            "#F0E442",  # 0 | + (zero to positive) - yellow
+            "white",  # 0 | 0 (no edge in either)
+            "#B55E00")  # 0 | - (zero to negative) - red-orange
 
 # Filter to show only visible (non-white) edges
 visible_edges <- edgeCol != "white"
 edgeCol_visible <- edgeCol[visible_edges]
-edge_labels <- c("+ → 0 (association lost)",
-                 "+ → − (association reversed)",
-                 "− → + (association reversed)",
-                 "0 → + (new positive association)",
-                 "0 → − (new negative association)")
+edge_labels <- c(
+              "+ → + (stronger positive in group 2)",
+              "+ → 0 (association lost)",
+              "+ → − (association reversed)",
+              "− → + (association reversed)",
+              "− → 0 (negative association lost)",
+              "− → − (stronger negative in group 2)",
+              "0 → + (new positive association)",
+              "0 → 0 (no edge in either group)",
+              "0 → − (new negative association)")
 
 # Edge type legend - PNG
 png("plots/png/differential_edge_legend.png", 
@@ -614,3 +616,11 @@ cat("  PNG: plots/png/phylum_legend.png\n")
 cat("  SVG: plots/svg/phylum_legend.svg\n")
 ```
 
+### Summary
+
+This analysis generated microbial association networks comparing healthy individuals to allergic patients and specific allergic subgroups. The networks reveal structural differences in microbial co-occurrence patterns associated with food allergy phenotypes. 
+
+Key outputs include:
+- Three paired network comparisons (non-IgE vs. IgE, Cluster B, and Cluster E)
+- Differential network plots highlighting association changes
+- Standalone legend files for interpretation
