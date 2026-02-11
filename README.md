@@ -21,7 +21,7 @@ This repository contains the analysis code, notebooks, and figures for the study
 	- `06_Network_analysis_with_NetCoMi.Rmd`: Network analysis using [NetCoMi](https://netcomi.de/)
 - `figures/`: Key figures and visualizations
 	- `abstract.png`: Visual abstract (see above)
-	- `cooccurrence_heatmap.png`, `ige_expression_boxplot.png`, `LAC_cube.png`, `presence_absence_heatmap.png`, `scree_plot.png`: Analysis figures
+	- `cooccurrence_heatmap.png`, `ige_expression_boxplot.png`, `LAC_cube.png`, `presence_absence_heatmap.png`, `scree_plot.png`, `ige_networks.png`: Analysis figures
 - `requirements.txt`: Python dependencies
 - `Dockerfile`: Reproducible environment setup
 
