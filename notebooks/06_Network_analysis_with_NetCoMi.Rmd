@@ -27,9 +27,6 @@ library(limma)
 
 ### Load Count Data and Construct Networks
 
-Data preparation
-/Users/oleg.vlasovets/ABROGATE/analysis/09_networks/05_Network_analysis.ipynb
-
 We load taxonomic count data aggregated at the family level for each sample group. The data represents microbial family abundances across healthy and allergic individuals, with separate files for the full allergic cohort and specific patient clusters
 
 ```{r}
