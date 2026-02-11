@@ -17,8 +17,8 @@ This repository contains the analysis code, notebooks, and figures for the study
 	- `02_diversity.ipynb`: Microbiome diversity analysis
 	- `03_DA_analysis.ipynb`: Differential abundance analysis
 	- `04_classification.ipynb`: Classification modeling
-	- `05_Network_analysis.ipynb`: Microbial network analysis
-	- `06_Network_visualization.Rmd`: Network visualization (R Markdown)
+	- `05_Network_analysis_data_preprocessing.ipynb`: Pick the subset for the network analysis
+	- `06_Network_analysis_with_NetCoMi.Rmd`: Network analysis using [NetCoMi](https://netcomi.de/)
 - `figures/`: Key figures and visualizations
 	- `abstract.png`: Visual abstract (see above)
 	- `cooccurrence_heatmap.png`, `ige_expression_boxplot.png`, `LAC_cube.png`, `presence_absence_heatmap.png`, `scree_plot.png`: Analysis figures
